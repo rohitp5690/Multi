@@ -7,4 +7,4 @@ langchain_huggingface
 langchain_text_splitters
 pypdf
 faiss-cpu
-
+wikipedia
