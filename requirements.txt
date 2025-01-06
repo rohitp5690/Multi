@@ -9,4 +9,6 @@ pypdf
 faiss-cpu
 wikipedia
 arxiv
-
+numpy
+easyocr
+PIL
