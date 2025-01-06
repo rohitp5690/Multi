@@ -11,4 +11,3 @@ wikipedia
 arxiv
 numpy
 easyocr
-PIL
