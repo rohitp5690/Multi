@@ -20,22 +20,27 @@ from langchain.agents import initialize_agent,AgentType
 from langchain.callbacks import StreamlitCallbackHandler
 from langchain.chains.llm import LLMChain
 from langchain.prompts import PromptTemplate
+import easyocr
+from PIL import Image
+import numpy as np
 
 st.set_page_config(page_title='AI DRK📜',page_icon='🦅')
 st.title(body='What can I help with?')
+ReaderOcr=easyocr.Reader(['en'],gpu=False)
 
-# os.environ['LANGCHAIN_API_KEY']=os.getenv('LANGCHAIN_API_KEY')
-os.environ['LANGCHAIN_API_KEY']=st.secrets['LANGCHAIN_API_KEY']
 
-os.environ['LANGCHAIN_TRACING_V2']='true'
+# # os.environ['LANGCHAIN_API_KEY']=os.getenv('LANGCHAIN_API_KEY')
+# os.environ['LANGCHAIN_API_KEY']=st.secrets['LANGCHAIN_API_KEY']
 
-# os.environ['HF_TOKEN']=os.getenv('HF_TOKEN')
-os.environ['HF_TOKEN']=st.secrets['HF_TOKEN']
+# os.environ['LANGCHAIN_TRACING_V2']='true'
 
-os.environ['LANGCHAIN_PROJECT']="Mutli AI"
+# # os.environ['HF_TOKEN']=os.getenv('HF_TOKEN')
+# os.environ['HF_TOKEN']=st.secrets['HF_TOKEN']
 
-# GROQ_API_KEY=os.getenv('GROQ_API_KEY')
-GROQ_API_KEY=st.secrets['GROQ_API_KEY']
+# os.environ['LANGCHAIN_PROJECT']="Mutli AI"
+
+# # GROQ_API_KEY=os.getenv('GROQ_API_KEY')
+# GROQ_API_KEY=st.secrets['GROQ_API_KEY']
 
 session_id=st.text_input('Session Id',value='default session')
 splitter=RecursiveCharacterTextSplitter(chunk_size=800,chunk_overlap=250)
@@ -63,8 +68,15 @@ prompts_dict = {
     "Ensure that the essay is well-structured, provides meaningful insights, and adheres to the word count i.e. 2400 to 2700 words. "
     "At the end of the essay, mention the various sources used in a brief citation format. "
     "The essay should be comprehensive, with clear organization and a professional tone."
-    )
-
+    ),
+"Gyan Kasauti": (
+    "Using the information from the uploaded PDF(s), analyze the content carefully and provide the most accurate answers to the multiple-choice questions provided through the input images in sequence. "
+    "Ensure that the answers are directly supported by the content in the PDF(s). "
+    "For each question, explicitly mention the question number and the selected answer, along with a brief justification or reference from the PDF(s) where applicable. "
+    "If a clear answer cannot be found for any question, explicitly state: 'The answer could not be found in the uploaded content.' "
+    "If similar or contextually related information is available, include it in the response and note that it is related but not a direct answer. "
+    "Maintain the sequence of the questions as they appear in the images for clarity."
+)
 }
 
 prompt_template1=("given a chat history and the latest user question"
@@ -196,7 +208,7 @@ with List_Tab[0]:
         if 'messages' not in st.session_state:
             st.session_state.messages=[]
         if user_query:
-            st.chat_message('user').write(user_query)
+            # st.chat_message('user').write(user_query)
         # st.session_state.messages.clear()
             with st.spinner("Generating response..."):
                 st.session_state.messages.append({'role':'user','content':user_query})
@@ -266,10 +278,42 @@ with List_Tab[2]:
     if User_Query_Prompt:
         input_data={'text':User_Query_Prompt}
         My_Response=chain.run(input_data)
-        st.success(My_Response)
+        st.chat_message('ai').write(My_Response)
 
 with List_Tab[3]:
-    st.write('Under Development')
+    st.warning('Under Development')
+
+with List_Tab[4]:
+    Context_Prompt=ChatPromptTemplate.from_messages([
+        ('system',prompts_dict['PDF User Query']),
+        MessagesPlaceholder(variable_name='chat_history'),
+        ('human','{input}')
+    ])
+    Query_Document=[]
+    with st.form('Gyan Kasauti'):
+        uploaded_files=st.file_uploader('1. Upload PDF/Circular',type=['pdf'],accept_multiple_files=True)
+        user_queries=st.file_uploader('2. Upload MCQ',['jpg','png','jpeg'],accept_multiple_files=True)
+        submitted=st.form_submit_button('Submit')
+    if uploaded_files and user_queries and submitted:
+        Conv_Rag_Chain,My_Agent=step1(session_id=session_id,temploc='./temp.pdf')
+        for user_query in user_queries:
+            Image_File=Image.open(user_query)
+            Image_Array=np.array(Image_File)
+            result=ReaderOcr.readtext(Image_Array,detail=0)
+            Query_Document.extend(result)
+        Final_Result='\n'.join(Query_Document)
+        response_Gk=Conv_Rag_Chain.invoke(
+            {'input':Final_Result},config={'configurable':{'session_id':session_id}}
+        )
+        response_GK1=My_Agent.run(Final_Result)
+        st.chat_message('assistant').write(response_Gk['answer'])
+        st.chat_message('ai').write(response_GK1)
+                
+                
+  
+        
+    
+
 
 
 
